@@ -2,7 +2,6 @@
 using System.Diagnostics;
 using HtmlAgilityPack;
 using ClosedXML.Excel;
-using DocumentFormat.OpenXml.EMMA;
 
 //Variables
 string[] login = File.ReadAllLines("login.txt");
