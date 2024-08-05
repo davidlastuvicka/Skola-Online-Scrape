@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using HtmlAgilityPack;
 using ClosedXML.Excel;
+using DocumentFormat.OpenXml.EMMA;
 
 //Variables
 string[] login = File.ReadAllLines("login.txt");
@@ -11,7 +12,6 @@ string auth = "";
 string session_info = "";
 string base_url = "https://aplikace.skolaonline.cz/SOL/";
 string raw_html = "";
-string column;
 string[] excel_columns = new string[6] { "A", "B", "C", "D", "E", "F" };
 int node_count;
 int grade_count = 1;
@@ -31,13 +31,51 @@ bool save_grades = false;
 bool verbose = false;
 bool list = false;
 bool record_performance = true;
-bool progress_count = true;
-bool save_excel = true;
+bool progress_count = false;
+bool save_excel = false;
 bool excel_debug = false;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-while (!auth_status) 
+//This function repeats 3 times in the code, which used to take up way more lines than needed
+void column_parse(string column)
+{
+
+    if (save_grades)
+    {
+        File.AppendAllText("grades.txt", column);
+    }
+    if (verbose)
+    {
+        Console.Write(column);
+    }
+    if (save_excel)
+    {
+        excel_current_cell = sheet.Cell($"{excel_columns[excel_column_count % 6]}{excel_row_count}");
+        if (excel_debug)
+        {
+            Console.Write($"{excel_columns[excel_column_count % 6]}{excel_row_count} ");
+        }
+        //Doubles and numbers are properly formatted
+        excel_current_cell.Value = column;
+        if (node_count == 7 || node_count == 8)
+        {
+            try
+            {
+                excel_current_cell.Value = Double.Parse(column.Replace(".", ","));
+            }
+            catch
+            {
+                excel_current_cell.Value = int.Parse(column.Replace(".", ","));
+            }
+            excel_current_cell.Style.NumberFormat.NumberFormatId = 0;
+        }
+        excel_column_count++;
+    }
+    node_count++;
+}
+
+while (!auth_status)
 {
     using (var client = new HttpClient())
     {
@@ -77,10 +115,10 @@ while (!auth_status)
             session_info = cookie.ElementAt(1);
 
             //If login is denied, only one 'Set-Cookie' header is returned, thus both elements of the 'cookie' variable end up being the same
-            if (auth == session_info) 
-            { 
-              Console.WriteLine("Login failed. Try again.");
-              auth_status = false;  
+            if (auth == session_info)
+            {
+                Console.WriteLine("Login failed. Try again.");
+                auth_status = false;
             }
             else
             {
@@ -100,7 +138,6 @@ while (!auth_status)
             request.Headers.Add("Cookie", $"{auth}");
             request.Headers.Add("Cookie", $"{session_info}");
 
-
             HttpResponseMessage response = await client.SendAsync(request);
             string content = await response.Content.ReadAsStringAsync();
             raw_html = content;
@@ -109,7 +146,6 @@ while (!auth_status)
         }
     }
 }
-
 
 htmlDoc.LoadHtml(raw_html);
 HtmlNodeCollection nodes = htmlDoc.DocumentNode.SelectNodes("//td/div/table/tbody/tr");
@@ -120,66 +156,34 @@ if (record_performance)
     sw.Start();
 }
 
-
 foreach (var HtmlNode in nodes)
 {
-    if (!list) 
+    if (!list)
     {
         Console.Clear();
     }
-    if (progress_count) 
+    if (progress_count)
     {
         Console.Write($"{grade_count}/{nodes.Count} ");
     }
     node_count = 0;
     foreach (var node in HtmlNode.ChildNodes)
     {
+        //In the HTML, the table has way more td and th elements which are invisible and contain nothing, this filters them out
         if (node_count < 4)
         {
             node_count++;
             continue;
         }
-        else if(node_count > 9)
+        else if (node_count > 9)
         {
             node_count++;
             continue;
         }
         //Columns in table either have a 'uv' value or 'title' value
-        try                                                                                                 
+        try
         {
-            column = HttpUtility.HtmlDecode(node.Attributes["uv"].Value) + " ";
-            if (save_grades)
-            {
-                File.AppendAllText("grades.txt", column);
-            }
-            if (verbose)
-            {
-                Console.Write(column);
-            }
-            if (save_excel) 
-            {
-                excel_current_cell = sheet.Cell($"{excel_columns[excel_column_count % 6]}{excel_row_count}");
-                if (excel_debug) 
-                { 
-                    Console.Write($"{excel_columns[excel_column_count % 6]}{excel_row_count} ");
-                }
-                //Doubles and numbers are properly formatted
-                excel_current_cell.Value = column;
-                if (node_count == 7 || node_count == 8)
-                {
-                    try
-                    {
-                        excel_current_cell.Value = Double.Parse(column.Replace(".",","));
-                    }
-                    catch
-                    {
-                        excel_current_cell.Value = int.Parse(column.Replace(".", ","));
-                    }
-                    excel_current_cell.Style.NumberFormat.NumberFormatId = 0;
-                }
-                excel_column_count++;
-            }
-            node_count++;
+            column_parse(HttpUtility.HtmlDecode(node.Attributes["uv"].Value) + " ");
         }
 
         //NullReferenceException is invoked basically every time
@@ -187,76 +191,12 @@ foreach (var HtmlNode in nodes)
         {
             try
             {
-                column = HttpUtility.HtmlDecode(node.Attributes["title"].Value) + " ";
-                if(save_grades) 
-                {
-                    File.AppendAllText("grades.txt", column);
-                }
-                if (verbose) 
-                {
-                    Console.Write(column);
-                }
-                if (save_excel)
-                {
-                    excel_current_cell = sheet.Cell($"{excel_columns[excel_column_count % 6]}{excel_row_count}");
-                    if (excel_debug) 
-                    {
-                        Console.Write($"{excel_columns[excel_column_count % 6]}{excel_row_count} ");
-                    }
-                    //Doubles and numbers are properly formatted
-                    excel_current_cell.Value = column;
-                    if (node_count == 7 || node_count == 8)
-                    {
-                        try
-                        {
-                            excel_current_cell.Value = Double.Parse(column.Replace(".", ","));
-                        }
-                        catch
-                        {
-                            excel_current_cell.Value = int.Parse(column.Replace(".", ","));
-                        }
-                        excel_current_cell.Style.NumberFormat.NumberFormatId = 0;
-                    }
-                    excel_column_count++;
-                }
-                node_count++;
+                //If another NullReferenceException is caught here, the column has neither a 'uv' or a 'title' and is an empty column
+                column_parse(HttpUtility.HtmlDecode(node.Attributes["title"].Value + " "));
             }
-            catch 
+            catch
             {
-                excel_current_cell = sheet.Cell($"{excel_columns[excel_column_count % 6]}{excel_row_count}");
-                column = "";
-                if (save_grades)
-                {
-                    File.AppendAllText("grades.txt", column);
-                }
-                if (verbose)
-                {
-                    Console.Write(column);
-                }
-                if (save_excel)
-                {
-                    excel_current_cell = sheet.Cell($"{excel_columns[excel_column_count % 6]}{excel_row_count}");
-                    if (excel_debug)
-                    {
-                        Console.Write($"{excel_columns[excel_column_count % 6]}{excel_row_count} ");
-                    }
-                    //Doubles and numbers are properly formatted
-                    excel_current_cell.Value = column;
-                    if (node_count == 7 || node_count == 8)
-                    {
-                        try
-                        {
-                            excel_current_cell.Value = Double.Parse(column.Replace(".", ","));
-                        }
-                        catch
-                        {
-                            excel_current_cell.Value = int.Parse(column.Replace(".", ","));
-                        }
-                        excel_current_cell.Style.NumberFormat.NumberFormatId = 0;
-                    }
-                    excel_column_count++;
-                }
-                node_count++;
+                column_parse("");
             }
         }
     }
@@ -264,27 +204,27 @@ foreach (var HtmlNode in nodes)
     if (save_grades)
     {
         File.AppendAllText("grades.txt", "\n");
-        
     }
-    if (list) 
+    if (list)
     {
         Console.Write("\n");
     }
+
     excel_row_count++;
     grade_count++;
 }
 
 //Printing optional alerts
-if(save_grades) 
+if (save_grades)
 {
     Console.WriteLine("Exported to text file.");
 }
-if (save_excel) 
+if (save_excel)
 {
     xls.SaveAs("grades.xlsx");
     Console.WriteLine("Exported to Excel File.");
 }
-if(record_performance) 
+if (record_performance)
 {
     sw.Stop();
     Console.WriteLine(sw.Elapsed);
