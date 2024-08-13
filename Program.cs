@@ -3,10 +3,22 @@ using System.Diagnostics;
 using HtmlAgilityPack;
 using ClosedXML.Excel;
 
+//Create settings files with base values
+if (!File.Exists("login.txt"))
+{
+    File.WriteAllText("login.txt", "username=\npassword=");
+}
+if (!File.Exists("options.txt"))
+{
+    File.WriteAllText("options.txt", "user_agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/115.0\nsave_grades=true\nverbose=true\nlist=true\nrecord_performance=false\nprogress_count=true\nsave_excel=true\nexcel_debug=false");
+}
+
 //Variables
 string[] login = File.ReadAllLines("login.txt");
-string username = login[0];
-string password = login[1];
+string username = login[0].Split('=')[1];
+string password = login[1].Split('=')[1];
+Console.WriteLine(username);
+Console.WriteLine(password);
 string auth = "";
 string session_info = "";
 string base_url = "https://aplikace.skolaonline.cz/SOL/";
@@ -17,6 +29,7 @@ int grade_count = 1;
 int excel_column_count = 0;
 int excel_row_count = 1;
 bool auth_status = false;
+bool already_failed = false;
 Stopwatch sw = new();
 IEnumerable<string> cookie;
 HtmlDocument htmlDoc = new();
@@ -24,15 +37,16 @@ XLWorkbook xls = new();
 IXLWorksheet sheet = xls.AddWorksheet("Sheet 1");
 IXLCell excel_current_cell;
 
-//Options
-string user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/115.0";
-bool save_grades = false;
-bool verbose = false;
-bool list = false;
-bool record_performance = true;
-bool progress_count = true;
-bool save_excel = false;
-bool excel_debug = false;
+//Options - i know its ugly
+string[] options = File.ReadAllLines("options.txt");
+string user_agent = options[0].Split('=')[1];
+bool save_grades = Convert.ToBoolean(options[1].Split('=')[1]);
+bool verbose = Convert.ToBoolean(options[2].Split('=')[1]); ;
+bool list = Convert.ToBoolean(options[3].Split('=')[1]); ;
+bool record_performance = Convert.ToBoolean(options[4].Split('=')[1]); ;
+bool progress_count = Convert.ToBoolean(options[5].Split('=')[1]); ;
+bool save_excel = Convert.ToBoolean(options[6].Split('=')[1]); ;
+bool excel_debug = Convert.ToBoolean(options[7].Split('=')[1]); ;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -99,6 +113,8 @@ while (!auth_status)
                 {"__RequestVerificationToken",""},
             };
 
+            Console.WriteLine("Attempting login...");
+
             //Request Properties
             request.Content = new FormUrlEncodedContent(values);
             request.Method = HttpMethod.Post;
@@ -110,13 +126,23 @@ while (!auth_status)
 
             //Retrieval of '.ASPXAUTH' and other cookies, the first being a token for authorization         
             response.Headers.TryGetValues("set-cookie", out cookie);
-            auth = cookie.ElementAt(0);
-            session_info = cookie.ElementAt(1);
+            already_failed = false;
+            try
+            {
+                auth = cookie.ElementAt(0);
+                session_info = cookie.ElementAt(1);
+            }
+            catch
+            {
+                Console.WriteLine("Login failed. Try again.");
+                auth_status = false;
+                already_failed = true;
+            }
 
             //If login is denied, only one 'Set-Cookie' header is returned, thus both elements of the 'cookie' variable end up being the same
             if (auth == session_info)
             {
-                Console.WriteLine("Login failed. Try again.");
+                if (!already_failed) { Console.WriteLine("Login failed. Try again."); }
                 auth_status = false;
             }
             else
