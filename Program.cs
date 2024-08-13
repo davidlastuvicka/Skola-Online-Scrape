@@ -30,7 +30,7 @@ bool save_grades = false;
 bool verbose = false;
 bool list = false;
 bool record_performance = true;
-bool progress_count = false;
+bool progress_count = true;
 bool save_excel = false;
 bool excel_debug = false;
 
@@ -226,7 +226,7 @@ if (save_excel)
 if (record_performance)
 {
     sw.Stop();
-    Console.WriteLine(sw.Elapsed);
+    Console.WriteLine("\nTotal runtime: " + sw.Elapsed.TotalMilliseconds + " milliseconds");
 }
 
 //Press key to exit
