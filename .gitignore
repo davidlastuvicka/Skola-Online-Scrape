@@ -7,7 +7,7 @@
 *.txt
 *.xlsx
 *.html
-*.wakatime-project
+.wakatime-project
 *.csproj.user
 
 # User-specific files
