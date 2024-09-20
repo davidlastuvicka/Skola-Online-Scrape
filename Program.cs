@@ -7,6 +7,9 @@ using ClosedXML.Excel;
 if (!File.Exists("login.txt"))
 {
     File.WriteAllText("login.txt", "username=\npassword=");
+    Console.WriteLine("Please fill in login details in the newly created 'login.txt' file and restart the program\nPress any key to exit..");
+    Console.ReadKey(true);
+    goto endofprogram;
 }
 if (!File.Exists("options.txt"))
 {
@@ -257,3 +260,4 @@ if (record_performance)
 
 //Press key to exit
 Console.Read();
+endofprogram:;
